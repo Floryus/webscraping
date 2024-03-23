@@ -4,7 +4,7 @@ from urllib.request import urlopen
 
 
 def run():
-    # Open CSV file in write mode and create a CSV writer object with semicolon delimiter
+    # CSV file öffnen im Schreibmodus und ein CSV-Schreibobjekt mit Semikolon-Trennzeichen erstellen
     with open(
         "data/data-immowelt.csv", "w", newline="", encoding="utf-8-sig"
     ) as csvfile:
@@ -33,31 +33,38 @@ def run():
             "Energy Demand",
             "Link",
         ]
+        # CSV-Header schreiben
         writer = csv.DictWriter(
             csvfile, fieldnames=fieldnames, delimiter=";", quotechar='"'
         )
         writer.writeheader()
 
+        # Basis-URL für die Suche nach Mietwohnungen in Berlin
         base_url = "https://www.immowelt.de/suche/berlin/wohnungen/mieten?d=true&sd=DESC&sf=TIMESTAMP&sp={}"
 
+        # Durch die ersten 100 Seiten der Suchergebnisse iterieren
         for page_number in range(1, 100):
+            # URL für die aktuelle Seite erstellen
             url = base_url.format(page_number)
             print("")
             print("🛜  Scraping page", page_number, ":", url)
+            # HTML-Seite herunterladen und dekodieren
             page = urlopen(url)
             html_bytes = page.read()
             html = html_bytes.decode("utf-8")
 
-            # Define a regular expression pattern to match links to individual estate pages
+            # Regex Pattern für die Links zu den einzelnen Immobilien-Seiten
             link_pattern = r'<a\s+href="([^"]+)"\s+id="[^"]+"\s+class="[^"]+"\s+target="_self"\s+rel="noreferrer">'
 
-            # Find all matches using the pattern
+            # Alle Links zu den Immobilien-Seiten finden
             estate_links = re.findall(link_pattern, html)
 
-            # Loop through each matched link
+            # Durch jede Immobilien-Seite iterieren
             for estate_link in estate_links:
                 estate_url = estate_link
                 print("Scraping estate:", estate_url, end=" ")
+
+                # HTML-Seite der Immobilie herunterladen und dekodieren
                 try:
                     estate_page = urlopen(estate_url)
                 except:
@@ -66,14 +73,15 @@ def run():
                 estate_html_bytes = estate_page.read()
                 estate_html = estate_html_bytes.decode("utf-8")
 
-                # Define a regular expression pattern to match div elements with class "EstateItem"
+                # Regex Pattern für den Inhalt der Immobilien-Seite
                 pattern = r"<app-objectmeta(.*?)Dieses Angebot melden"
 
-                # Find all matches using the pattern
+                # Alle Elemente auf der Immobilien-Seite finden
                 estate_items = re.findall(pattern, estate_html, re.DOTALL)
 
-                # Loop through each matched element
+                # Durch alle Elemente auf der Immobilien-Seite iterieren
                 for estate in estate_items:
+                    # Datenstruktur für die Immobilie initialisieren
                     estate_data = {
                         "Title": "",
                         "Warm Price": "",
@@ -100,10 +108,7 @@ def run():
                         "Link": estate_url,
                     }
 
-                    # with open("estateSite.html", "w", encoding="utf-8") as f:
-                    #   f.write(estate)
-
-                    # Extracting attributes using regular expressions
+                    # Einzelne Datenpunkte aus dem Immobilien-Element extrahieren
                     title_match = re.search(
                         r"<h1 _ngcontent-sc210=\"\" class=\"ng-star-inserted\">(.*?)</h1>",
                         estate,
@@ -122,7 +127,6 @@ def run():
                     if area_match:
                         try:
                             area = area_match.group(1).strip()
-                            # Extract only the number from the room size
                             room_size = re.search(r"\d+", area)
                             if room_size:
                                 estate_data["Room Size (m²)"] = room_size.group(0)
@@ -176,7 +180,7 @@ def run():
                                     ]
                                     cold_price = re.sub(
                                         r"[^\d.,]", "", raw_price
-                                    )  # Extract only numbers, periods, and commas
+                                    )  # only numbers, periods, and commas
                                     estate_data["Cold Price"] = cold_price
                                 if value == "Warmmiete":
                                     raw_price = extracted_text[
@@ -184,7 +188,7 @@ def run():
                                     ]
                                     warm_price = re.sub(
                                         r"[^\d.,]", "", raw_price
-                                    )  # Extract only numbers, periods, and commas
+                                    )  #  only numbers, periods, and commas
                                     estate_data["Warm Price"] = warm_price
                                 if value == "Nebenkosten":
                                     raw_cost = extracted_text[
@@ -192,7 +196,7 @@ def run():
                                     ]
                                     utilities_cost = re.sub(
                                         r"[^\d.,]", "", raw_cost
-                                    )  # Extract only numbers, periods, and commas
+                                    )  # only numbers, periods, and commas
                                     estate_data["Utilities Cost"] = utilities_cost
                                 if value == "Kaution":
                                     raw_deposit = extracted_text[
@@ -303,5 +307,6 @@ def run():
                         except:
                             pass
 
+                    # Alle Daten in CSV-Datei schreiben
                     writer.writerow(estate_data)
                     print("✅")
